@@ -10,6 +10,10 @@ from sklearn.model_selection import train_test_split
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import SMOTE
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report
               
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
@@ -36,13 +40,13 @@ def uploapreprocess_dfile():
 
         session['uploaded_data_file_path'] = file_location
 
-        if request.form['submit_button'] == 'EDA':
-            return render_template('eda.html')
-        
-        elif request.form['submit_button'] == 'Preprocess':
+        if request.form['submit_button'] == 'Preprocess':
             #uploaded_preprocess_df = pd.read_csv(file_location)
             return redirect('/preprocess')
             #return render_template('preprocess.html', data_var = preprocess_df_html)
+        
+        elif request.form['submit_button'] == 'Model':
+             return render_template('model.html')
     
     else:
         return render_template('index.html')
@@ -211,6 +215,55 @@ def download():
 def download_csv():
     download_file_path = session.get('download_data_file_path',None)
     return send_file(download_file_path, as_attachment=True)
+
+@app.route('/model', methods=['GET', 'POST'])
+def model_implementation():
+    if request.method == 'GET':
+        return render_template('model.html')
+
+    elif request.method == 'POST':
+        data_file_for_model = session.get('uploaded_data_file_path', None)
+        model_df = pd.read_csv(data_file_for_model, skipinitialspace=True)
+
+        model_target = model_df.columns[-1]     #Selecting the last label as target
+        #train test split
+        X_train, X_test, y_train, y_test = train_test_split(
+        model_df.drop(labels=[model_target], axis=1),
+        model_df[model_target],
+        test_size=0.3,
+        random_state=None)
+
+        if request.form['submit_button'] == 'Decision Tree':
+            initialModel = DecisionTreeClassifier(
+                            criterion='gini',
+                            splitter='best'
+                            )
+            initialModel.fit(X_train, y_train)
+            predictions = initialModel.predict(X_test)
+            report = classification_report(y_test, predictions, digits=4, output_dict=True)
+            report_df = pd.DataFrame.from_dict(report)
+            report_df = report_df.transpose()
+            return render_template('result.html', result_data=report_df)
+        
+        elif request.form['submit_button'] == 'KNN':
+            initialModel = KNeighborsClassifier()
+            initialModel.fit(X_train, y_train)
+            predictions = initialModel.predict(X_test)
+            report = classification_report(y_test, predictions, digits=4, output_dict=True)
+            report_df = pd.DataFrame.from_dict(report)
+            report_df = report_df.transpose()
+            return render_template('result.html', result_data=report_df)
+        
+        elif request.form['submit_button'] == 'SVM':
+            initialModel = SVC(random_state=1)
+            initialModel.fit(X_train, y_train)
+            predictions = initialModel.predict(X_test)
+            report = classification_report(y_test, predictions, digits=4, output_dict=True)
+            report_df = pd.DataFrame.from_dict(report)
+            report_df = report_df.transpose()
+            return render_template('result.html', result_data=report_df)
+            
+        
 
 
 if __name__ == "__main__":

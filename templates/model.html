@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block head %} 
+
+{% endblock %}
+
+{% block body %} 
+<h3>Available models</h3>
+<form action = "/model" method = "POST" enctype="multipart/form-data" target="_self">    
+    <input type="submit" name="submit_button" value="Decision Tree"><br>
+    <input type="submit" name="submit_button" value="KNN"><br>
+    <input type="submit" name="submit_button" value="SVM"><br>
+
+</form>
+{% endblock %}
