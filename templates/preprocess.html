@@ -15,11 +15,13 @@
     <input type="radio" id="Imputation" name="MissingData" value="Imputation">
     <label for="Imputation">Imputation</label><br><br>
 
-    <label>Hanle imbalanced dataset</label>
+    <label>Handle imbalanced dataset</label>
     <input type="radio" id="UnderSample" name="ImbalanceData" value="UnderSample">
     <label for="UnderSample">Under Sampling</label>
     <input type="radio" id="OverSample" name="ImbalanceData" value="OverSample">
-    <label for="OverSample">Over Sampling</label><br><br>
+    <label for="OverSample">Over Sampling</label>
+    <input type="radio" id="None" name="ImbalanceData" value="None">
+    <label for="None">None</label><br><br>
 
     <label>Encoding</label>
     <label for="LabelEncoding">Columns for label encoding</label>
@@ -33,7 +35,9 @@
     <input type="radio" id="Normalization" name="ScaleData" value="Normalization">
     <label for="Normalization">Normalization</label>
     <input type="radio" id="Standardization" name="ScaleData" value="Standardization">
-    <label for="Standardization">Standardization</label><br><br>
+    <label for="Standardization">Standardization</label>
+    <input type="radio" id="None" name="ScaleData" value="None">
+    <label for="None">None</label><br><br>
 
     <input type="submit" value="Launch">
 

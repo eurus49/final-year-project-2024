@@ -75,14 +75,20 @@ def Preprocess():
 
         #Label encoding
         feature_for_label_enc = str(request.form['LabelEncoding']).split()
-        for x in feature_for_label_enc:
-            label_encoder = preprocessing.LabelEncoder()
-            preprocess_df[x] = label_encoder.fit_transform(preprocess_df[x])
+        if not feature_for_label_enc:
+            pass
+        else:
+            for x in feature_for_label_enc:
+                label_encoder = preprocessing.LabelEncoder()
+                preprocess_df[x] = label_encoder.fit_transform(preprocess_df[x])
 
         #One hot encoding
         feature_for_one_enc = str(request.form['OneHotEncoding']).split()
-        for y in feature_for_one_enc:
-            preprocess_df = pd.get_dummies(preprocess_df, columns=[y], drop_first = True)
+        if not feature_for_one_enc:
+            pass
+        else:
+            for y in feature_for_one_enc:
+                preprocess_df = pd.get_dummies(preprocess_df, columns=[y], drop_first = True)
         
         #putting target label back at last
         preprocess_df.insert(len(preprocess_df.columns)-1, target_label, preprocess_df.pop(target_label))  
@@ -98,7 +104,10 @@ def Preprocess():
             col_list = preprocess_df.columns.values.tolist()
             imputer = KNNImputer(n_neighbors=5)
             imputed_data = imputer.fit_transform(preprocess_df)
-            preprocess_df = pd.DataFrame(data=imputed_data, columns = col_list )
+            preprocess_df = pd.DataFrame(data=imputed_data, columns = col_list)
+
+        elif request.form['MissingData'] == 'None':
+            pass
 
         #Split data to make it easier to perform the functions below
         X_train, X_test, y_train, y_test = train_test_split(
@@ -119,7 +128,9 @@ def Preprocess():
             sm = SMOTE(random_state=42)
             x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
         
-        
+        elif request.form['ImbalanceData'] == 'None':
+            pass
+
         #Feature scaling 
         date_df = x_all_data[['Day', 'Month', 'Year']].copy()
         x_all_data = x_all_data.drop(['Day', 'Month', 'Year'], axis=1)
@@ -146,9 +157,11 @@ def Preprocess():
                 temp_df = pd.DataFrame(x_all_data[j])
                 stan_var = StandardScaler().fit(temp_df)
                 x_all_data[j] = stan_var.transform(temp_df)
-        x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            x_all_data = pd.concat([x_all_data,date_df], axis=1)
 
-
+        elif request.form['ScaleData'] == 'None':
+            pass
+        
         #Correlation Based Feature selection
         threshold = 0.90
         cor_features = set()   #set of all names of correlated columns
@@ -164,7 +177,8 @@ def Preprocess():
 
         preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
         preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
-        uploaded_preprocess_df_html = preprocess_df.to_html()
+        small_df = preprocess_df.head(10)
+        uploaded_preprocess_df_html = small_df.to_html()
         return render_template('PrepSuccess.html', var_newdata=uploaded_preprocess_df_html)
     
     elif request.method == 'GET':
