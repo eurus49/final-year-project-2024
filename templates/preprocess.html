@@ -1,0 +1,38 @@
+{% block head %} 
+
+{% endblock %}
+
+{% block body %} 
+<form action = "/preprocess" method = "POST" enctype="multipart/form-data" target="_self" >    
+    <label>Dataset</label><br><br>
+    
+    <lable>Handle missing data</lable>
+    <input type="radio" id="Deletion" name="MissingData" value="Deletion">
+    <label for="Deletion">Deletion</label>
+    <input type="radio" id="Imputation" name="MissingData" value="Imputation">
+    <label for="Imputation">Imputation</label><br><br>
+
+    <label>Hanle imbalanced dataset</label>
+    <input type="radio" id="UnderSample" name="ImbalanceData" value="UnderSample">
+    <label for="UnderSample">Under Sampling</label>
+    <input type="radio" id="OverSample" name="ImbalanceData" value="OverSample">
+    <label for="OverSample">Over Sampling</label><br><br>
+
+    <label>Encoding</label>
+    <label for="LabelEncoding">Columns for label encoding</label>
+    <input type="text" id="LabelEncoding" name="LabelEncoding">
+    <label for="OneHotEncoding">Columns for one hot encoding</label>
+    <input type="text" id="OneHotEncoding" name="OneHotEncoding"> <br><br>
+
+    <label>Feature Selection: Correlation based Feature Selection</label><br><br>
+
+    <label>Feature Scaling</label>
+    <input type="radio" id="Normalization" name="ScaleData" value="Normalization">
+    <label for="Normalization">Normalization</label>
+    <input type="radio" id="Standardization" name="ScaleData" value="Standardization">
+    <label for="Standardization">Standardization</label><br><br>
+
+    <input type="submit" value="Launch">
+
+</form>
+{% endblock %}
