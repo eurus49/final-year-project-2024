@@ -9,8 +9,8 @@ from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import SMOTE
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
               
-
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
 
@@ -53,6 +53,7 @@ def Preprocess():
         
         data_file_path = session.get('uploaded_data_file_path',None)
         preprocess_df = pd.read_csv(data_file_path, skipinitialspace = True)
+        preprocess_df.drop(labels=['index'], axis=1, inplace=True)
         col = preprocess_df.columns
 
         #saving the target label of the dataset
@@ -118,6 +119,23 @@ def Preprocess():
             sm = SMOTE(random_state=42)
             x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
         
+        
+        #Feature scaling 
+        if request.form['ScaleData'] == 'Normalization':
+            norm_var = MinMaxScaler().fit(x_all_data)
+            x_all_data = norm_var.transform(x_all_data)
+
+        elif request.form['ScaleData'] == 'Standardization':
+            categorical_data = feature_for_label_enc + feature_for_one_enc
+            new_col_list = preprocess_df.columns.to_list()
+            res = [i for i in new_col_list if i not in categorical_data]
+
+            for j in res:
+                stan_var = StandardScaler().fit(x_all_data)
+                x_all_data[i] = stan_var.transform(x_all_data[i])
+
+
+
         uploaded_preprocess_df_html = preprocess_df.to_html()
         return render_template('PrepSuccess.html', var_newdata=uploaded_preprocess_df_html)
     
