@@ -4,11 +4,10 @@
 {% endblock %}
 
 {% block body %} 
-<h3>Your dataset </h3><br>
-{{ data_var|safe}}
 <br><br>
 <form action = "/preprocess" method = "POST" enctype="multipart/form-data" target="_self" >    
     <label>Dataset</label><br><br>
+    {{ data_var|safe}}
     
     <label>Handle missing data</label>
     <input type="radio" id="Deletion" name="MissingData" value="Deletion">
