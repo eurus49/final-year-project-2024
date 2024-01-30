@@ -1,3 +1,4 @@
+#from script import detect_data 
 from flask import Flask, render_template,redirect, session, url_for, request
 from werkzeug.utils import secure_filename
 import pandas as pd
@@ -5,7 +6,10 @@ from fileinput import filename
 import os
 from sklearn.impute import KNNImputer          #importing KNNImputer for imputation of missing values
 from sklearn import preprocessing
-#from script import detect_data                #Importing function to detect data types
+from sklearn.model_selection import train_test_split
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import SMOTE
+              
 
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
@@ -54,7 +58,7 @@ def Preprocess():
         #saving the target label of the dataset
         target_label = ''
         target_label += ''.join((preprocess_df.iloc[[1],[len(col)-1]]).columns.tolist())
-        
+
         #Detecting and processing date time data
         feature_name = ''
         for i in range(1, len(col)):
@@ -95,7 +99,24 @@ def Preprocess():
             imputed_data = imputer.fit_transform(preprocess_df)
             preprocess_df = pd.DataFrame(data=imputed_data, columns = col_list )
 
+        #Split data to make it easier to perform the functions below
+        X_train, X_test, y_train, y_test = train_test_split(
+        preprocess_df.drop(labels=[target_label], axis=1),
+        preprocess_df[target_label],
+        test_size=0.3,
+        random_state=None)
 
+        x_all_data = pd.concat([X_train,X_test], axis=0)
+        y_all_data = pd.concat([y_train,y_test], axis=0)
+
+        #Handling imbalanced dataset
+        if request.form['ImbalanceData'] == 'UnderSample':
+            rs = RandomUnderSampler(random_state=42)
+            x_all_data, y_all_data = rs.fit_resample(x_all_data,y_all_data)
+        
+        elif request.form['ImbalanceData'] == 'UnderSample':
+            sm = SMOTE(random_state=42)
+            x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
         
         uploaded_preprocess_df_html = preprocess_df.to_html()
         return render_template('PrepSuccess.html', var_newdata=uploaded_preprocess_df_html)
