@@ -1,5 +1,5 @@
 #from script import detect_data 
-from flask import Flask, render_template,redirect, session, url_for, request
+from flask import Flask, render_template,redirect, send_file, session, url_for, request
 from werkzeug.utils import secure_filename
 import pandas as pd
 from fileinput import filename
@@ -161,7 +161,7 @@ def Preprocess():
 
         elif request.form['ScaleData'] == 'None':
             pass
-        
+
         #Correlation Based Feature selection
         threshold = 0.90
         cor_features = set()   #set of all names of correlated columns
@@ -177,9 +177,13 @@ def Preprocess():
 
         preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
         preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
-        small_df = preprocess_df.head(10)
-        uploaded_preprocess_df_html = small_df.to_html()
-        return render_template('PrepSuccess.html', var_newdata=uploaded_preprocess_df_html)
+
+        download_folder = os.path.join('static','downloads')
+        download_file = 'Preprocessed_Data.csv'
+        download_file_path = download_folder + "/" + download_file
+        preprocess_df.to_csv(download_file_path, index=False)
+        session['download_data_file_path'] = download_file_path
+        return redirect('/download')
     
     elif request.method == 'GET':
         mylocation = session.get('uploaded_data_file_path',None)
@@ -190,15 +194,24 @@ def Preprocess():
 
 
 
+@app.route('/download', methods=['GET', 'POST'])
+def download():
+    if request.method == 'GET':
+        download_file_path = session.get('download_data_file_path',None)
+        download_preprocess_df = pd.read_csv(download_file_path)
+        temp_down = download_preprocess_df.head(10)
+        download_preprocess_df_html = temp_down.to_html()
 
+        return render_template('PrepSuccess.html', var_newdata=download_preprocess_df_html)
 
-@app.route('/showData')
-def showCSV():
-    data_file_path = session.get('uploaded_data_file_path',None)
-    uploaded_preprocess_df = pd.read_csv(data_file_path)
-    uploaded_preprocess_df_html = uploaded_preprocess_df.to_html()
+    elif request.method == 'POST':
+        return redirect('/download-csv')
 
-    return render_template('showCSV.html', data_var=uploaded_preprocess_df_html)
+@app.route('/download-csv')
+def download_csv():
+    download_file_path = session.get('download_data_file_path',None)
+    return send_file(download_file_path, as_attachment=True)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
