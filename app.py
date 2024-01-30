@@ -31,10 +31,13 @@ def uploadFile():
         session['uploaded_data_file_path'] = file_location
 
         if request.form['submit_button'] == 'EDA':
-            return render_template('Eda.html')
+            return render_template('eda.html')
         
         elif request.form['submit_button'] == 'Preprocess':
-            return render_template('Preprocessing.html')
+            uploaded_df = pd.read_csv(file_location)
+            small_df = uploaded_df.head(n=5)
+            df_html = small_df.to_html()
+            return render_template('preprocess.html', data_var = df_html)
     
     else:
         return render_template('index.html')
@@ -46,13 +49,10 @@ def preprocess():
         data_file_path = session.get('uploaded_data_file_path',None)
         preprocess_df = pd.read_csv(data_file_path)
         
-        #
-        return render_template('preprocess.html')
+        
+        return render_template('PrepSuccess.html')
     
     else:
-        data_file_path = session.get('uploaded_data_file_path',None)
-        uploaded_df = pd.read_csv(data_file_path)
-        uploaded_df_html = uploaded_df.to_html()
         return render_template('preprocess.html')
 
 

@@ -1,3 +1,4 @@
+{% extends 'base.html' %}
 {% block head %} 
 
 {% endblock %}
@@ -6,6 +7,6 @@
 <form action = "/" method = "POST" enctype="multipart/form-data" target="_self">    
     <input type="file" name="file" accept=".csv">
     <input type = "submit" name="submit_button" value="EDA"> 
-    <input type = "submit" name="submit_button" value="Preprocess"
+    <input type = "submit" name="submit_button" value="Preprocess">
 </form>
 {% endblock %}
