@@ -115,33 +115,61 @@ def Preprocess():
             rs = RandomUnderSampler(random_state=42)
             x_all_data, y_all_data = rs.fit_resample(x_all_data,y_all_data)
         
-        elif request.form['ImbalanceData'] == 'UnderSample':
+        elif request.form['ImbalanceData'] == 'OverSample':
             sm = SMOTE(random_state=42)
             x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
         
         
         #Feature scaling 
+        date_df = x_all_data[['Day', 'Month', 'Year']].copy()
+        x_all_data = x_all_data.drop(['Day', 'Month', 'Year'], axis=1)
+        
+        new_col_list = preprocess_df.columns.to_list()
+
         if request.form['ScaleData'] == 'Normalization':
             norm_var = MinMaxScaler().fit(x_all_data)
             x_all_data = norm_var.transform(x_all_data)
 
+            new_target = preprocess_df.columns[-1]
+            exclude_list = ['Day', 'Month', 'Year', new_target]
+            col_after_elimination = [i for i in new_col_list if i not in exclude_list]
+            x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
+            x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            
+
         elif request.form['ScaleData'] == 'Standardization':
-            categorical_data = feature_for_label_enc + feature_for_one_enc
-            new_col_list = preprocess_df.columns.to_list()
+            date_list = ['Day', 'Month', 'Year']
+            categorical_data = feature_for_label_enc + feature_for_one_enc + date_list
             res = [i for i in new_col_list if i not in categorical_data]
-
+            
             for j in res:
-                stan_var = StandardScaler().fit(x_all_data)
-                x_all_data[i] = stan_var.transform(x_all_data[i])
+                temp_df = pd.DataFrame(x_all_data[j])
+                stan_var = StandardScaler().fit(temp_df)
+                x_all_data[j] = stan_var.transform(temp_df)
+        x_all_data = pd.concat([x_all_data,date_df], axis=1)
 
 
+        #Correlation Based Feature selection
+        threshold = 0.90
+        cor_features = set()   #set of all names of correlated columns
+        cor_matrix = preprocess_df.corr()
+        for i in range(len(cor_matrix.columns)):
+            for j in range(i):
+                if abs(cor_matrix.iloc[i, j]) > threshold: #Absolute coeff value is used
+                    colName = cor_matrix.columns[i]  #saving the names of correlated columns
+                    cor_features.add(colName)
+        
+        x_all_data.drop(labels=cor_features, axis=1, inplace=True)
+        
 
+        preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
+        preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
         uploaded_preprocess_df_html = preprocess_df.to_html()
         return render_template('PrepSuccess.html', var_newdata=uploaded_preprocess_df_html)
     
     elif request.method == 'GET':
         mylocation = session.get('uploaded_data_file_path',None)
-        uploaded_preprocess_df = pd.read_csv(mylocation)
+        uploaded_preprocess_df = pd.read_csv(mylocation, skipinitialspace = True)
         small_preprocess_df = uploaded_preprocess_df.head(n=5)
         preprocess_df_html = small_preprocess_df.to_html()
         return render_template('preprocess.html', data_var = preprocess_df_html)
