@@ -7,7 +7,9 @@
 <br><br>
 <div style="text-align: center;">
     <h3>Classification report</h3>
-    <pre>{{ result_data }}</pre>
+    <pre>{{ result_data }}</pre><br>
+    <p>The optimum parameters selected for the models are </p>
+    {{ params|safe }}
 </div>
 
 {% endblock %}

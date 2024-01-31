@@ -14,6 +14,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report
+from sklearn.model_selection import RandomizedSearchCV
               
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
@@ -184,9 +185,9 @@ def Preprocess():
 
         download_folder = os.path.join('static','downloads')
         download_file = 'Preprocessed_Data.csv'
-        download_file_path = download_folder + "/" + download_file
+        download_file_path = download_folder + "/" + download_file   #Creating path where the downloadable file will be stored
         preprocess_df.to_csv(download_file_path, index=False)
-        session['download_data_file_path'] = download_file_path
+        session['download_data_file_path'] = download_file_path  #Store download file path in session
         return redirect('/download')
     
     elif request.method == 'GET':
@@ -233,35 +234,86 @@ def model_implementation():
         test_size=0.3,
         random_state=None)
 
+        #Machine learning models
+        
         if request.form['submit_button'] == 'Decision Tree':
             initialModel = DecisionTreeClassifier(
                             criterion='gini',
                             splitter='best'
                             )
-            initialModel.fit(X_train, y_train)
-            predictions = initialModel.predict(X_test)
+            
+            hyperparameters = { 'max_depth' : [i for i in range(1, 15)]}
+
+            FinalModel = RandomizedSearchCV(
+             initialModel,
+             param_distributions = hyperparameters,
+             cv = 10,
+             n_jobs = -1
+            )
+        
+            FinalModel.fit(X_train, y_train)
+            
+            best_params = FinalModel.best_params_
+            
+            Tuned_model = FinalModel.best_estimator_
+
+            predictions = Tuned_model.predict(X_test)
+
             report = classification_report(y_test, predictions, digits=4, output_dict=True)
             report_df = pd.DataFrame.from_dict(report)
             report_df = report_df.transpose()
-            return render_template('result.html', result_data=report_df)
+            return render_template('result.html', result_data=report_df, params=best_params)
         
         elif request.form['submit_button'] == 'KNN':
+            hyperparameters = [{'leaf_size':[i for i in range(1, 20)], 
+                    'n_neighbors':[j for j in range(1,30)],
+                    'p':[1,2]}]
+            
             initialModel = KNeighborsClassifier()
-            initialModel.fit(X_train, y_train)
-            predictions = initialModel.predict(X_test)
+            
+            FinalModel = RandomizedSearchCV(
+            initialModel,
+             param_distributions = hyperparameters,
+             cv = 10,
+             n_jobs = -1)
+            
+            FinalModel.fit(X_train, y_train)
+
+            best_params = FinalModel.best_params_
+
+            Tuned_model = FinalModel.best_estimator_
+            
+            predictions = Tuned_model.predict(X_test)
+            
             report = classification_report(y_test, predictions, digits=4, output_dict=True)
             report_df = pd.DataFrame.from_dict(report)
             report_df = report_df.transpose()
-            return render_template('result.html', result_data=report_df)
+            return render_template('result.html', result_data=report_df, params=best_params)
         
         elif request.form['submit_button'] == 'SVM':
+            hyperparameters = [{'kernel':['rbf'], 'C':[0.1,1,10,100], 
+                    'gamma':[1,0.1,0.01,0.001]}]
+            
             initialModel = SVC(random_state=1)
-            initialModel.fit(X_train, y_train)
-            predictions = initialModel.predict(X_test)
+
+            FinalModel = RandomizedSearchCV(
+             initialModel,
+             param_distributions = hyperparameters,
+             cv = 10,
+             n_jobs = -1)
+            
+            FinalModel.fit(X_train, y_train)
+
+            best_params = FinalModel.best_params_
+
+            Tuned_model = FinalModel.best_estimator_
+
+            predictions = Tuned_model.predict(X_test)
+
             report = classification_report(y_test, predictions, digits=4, output_dict=True)
             report_df = pd.DataFrame.from_dict(report)
             report_df = report_df.transpose()
-            return render_template('result.html', result_data=report_df)
+            return render_template('result.html', result_data=report_df, params = best_params)
             
         
 
