@@ -1,45 +1,46 @@
 {% extends 'base.html' %}
 {% block head %} 
-
+<h2>Dataset</h2>
 {% endblock %}
 
 {% block body %} 
-<br><br>
-<form action = "/preprocess" method = "POST" enctype="multipart/form-data" target="_self" >    
-    <label>Dataset</label><br><br>
-    {{ data_var|safe}}
+{{ data_var|safe}}
+<div style="text-align: center;">
+    <form action = "/preprocess" method = "POST" enctype="multipart/form-data" target="_self" >    
+        <br><br>
+        <label>Handle missing data</label><br>
+        <input type="radio" id="Deletion" name="MissingData" value="Deletion">
+        <label for="Deletion">Deletion</label>
+        <input type="radio" id="Imputation" name="MissingData" value="Imputation">
+        <label for="Imputation">Imputation</label><br><br>
     
-    <label>Handle missing data</label>
-    <input type="radio" id="Deletion" name="MissingData" value="Deletion">
-    <label for="Deletion">Deletion</label>
-    <input type="radio" id="Imputation" name="MissingData" value="Imputation">
-    <label for="Imputation">Imputation</label><br><br>
+        <label>Handle imbalanced dataset</label><br>
+        <input type="radio" id="UnderSample" name="ImbalanceData" value="UnderSample">
+        <label for="UnderSample">Under Sampling</label>
+        <input type="radio" id="OverSample" name="ImbalanceData" value="OverSample">
+        <label for="OverSample">Over Sampling</label>
+        <input type="radio" id="None" name="ImbalanceData" value="None">
+        <label for="None">None</label><br><br>
+    
+        <label>Encoding</label><br>
+        <label for="LabelEncoding">Columns for label encoding</label>
+        <input type="text" id="LabelEncoding" name="LabelEncoding"><br>
+        <label for="OneHotEncoding">Columns for one hot encoding</label>
+        <input type="text" id="OneHotEncoding" name="OneHotEncoding"> <br><br>
+    
+        <label>Feature Selection: Correlation based Feature Selection</label><br><br>
+    
+        <label>Feature Scaling</label><br>
+        <input type="radio" id="Normalization" name="ScaleData" value="Normalization">
+        <label for="Normalization">Normalization</label>
+        <input type="radio" id="Standardization" name="ScaleData" value="Standardization">
+        <label for="Standardization">Standardization</label>
+        <input type="radio" id="None" name="ScaleData" value="None">
+        <label for="None">None</label><br><br>
+    
+        <input class="btn" type="submit" value="Launch">
+    
+    </form>
+</div>
 
-    <label>Handle imbalanced dataset</label>
-    <input type="radio" id="UnderSample" name="ImbalanceData" value="UnderSample">
-    <label for="UnderSample">Under Sampling</label>
-    <input type="radio" id="OverSample" name="ImbalanceData" value="OverSample">
-    <label for="OverSample">Over Sampling</label>
-    <input type="radio" id="None" name="ImbalanceData" value="None">
-    <label for="None">None</label><br><br>
-
-    <label>Encoding</label>
-    <label for="LabelEncoding">Columns for label encoding</label>
-    <input type="text" id="LabelEncoding" name="LabelEncoding">
-    <label for="OneHotEncoding">Columns for one hot encoding</label>
-    <input type="text" id="OneHotEncoding" name="OneHotEncoding"> <br><br>
-
-    <label>Feature Selection: Correlation based Feature Selection</label><br><br>
-
-    <label>Feature Scaling</label>
-    <input type="radio" id="Normalization" name="ScaleData" value="Normalization">
-    <label for="Normalization">Normalization</label>
-    <input type="radio" id="Standardization" name="ScaleData" value="Standardization">
-    <label for="Standardization">Standardization</label>
-    <input type="radio" id="None" name="ScaleData" value="None">
-    <label for="None">None</label><br><br>
-
-    <input type="submit" value="Launch">
-
-</form>
 {% endblock %}

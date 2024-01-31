@@ -4,9 +4,13 @@
 {% endblock %}
 
 {% block body %} 
-<form action = "/" method = "POST" enctype="multipart/form-data" target="_self">    
-    <input type="file" name="file" accept=".csv">
-    <input type = "submit" name="submit_button" value="Preprocess">
-    <input type = "submit" name="submit_button" value="Model"> 
-</form>
+
+<br><br>
+<div style="text-align: center;">
+    <form action = "/" method = "POST" enctype="multipart/form-data" target="_self">    
+        <input style="color: black;" type="file" name="file" accept=".csv"><br><br><br>
+        <input style="margin-right: 1cm;" class="btn" type = "submit" name="submit_button" value="Preprocess">
+        <input class="btn" type = "submit" name="submit_button" value="Model"> 
+    </form>
+</div>
 {% endblock %}
