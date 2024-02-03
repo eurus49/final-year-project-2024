@@ -8,6 +8,13 @@
 <div style="text-align: center;">
     <form action = "/preprocess" method = "POST" enctype="multipart/form-data" target="_self" >    
         <br><br>
+        <label>Enter target label </label>
+        <input type="text" id="TargetLabel" name="TargetLabel" required> <br><br>
+        <br><br>
+
+        <label>Remove features </label><br>
+        <input type="text" id="ColumnsRemove" name="ColumnsRemove"> <br><br>
+
         <label>Handle missing data</label><br>
         <input type="radio" id="Deletion" name="MissingData" value="Deletion">
         <label for="Deletion">Deletion</label>

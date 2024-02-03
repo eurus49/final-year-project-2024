@@ -15,7 +15,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report
 from sklearn.model_selection import RandomizedSearchCV
-              
+from ydata_profiling import ProfileReport
+from sklearn import preprocessing
+
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
 
@@ -41,7 +43,10 @@ def uploapreprocess_dfile():
 
         session['uploaded_data_file_path'] = file_location
 
-        if request.form['submit_button'] == 'Preprocess':
+        if request.form['submit_button'] == 'EDA':
+             return redirect('/eda')
+
+        elif request.form['submit_button'] == 'Preprocess':
             #uploaded_preprocess_df = pd.read_csv(file_location)
             return redirect('/preprocess')
             #return render_template('preprocess.html', data_var = preprocess_df_html)
@@ -52,18 +57,57 @@ def uploapreprocess_dfile():
     else:
         return render_template('index.html')
 
+@app.route('/eda', methods=['GET', 'POST'])
+def eda():
+    if request.method == 'GET':
+        location_for_eda = session.get('uploaded_data_file_path',None)
+        uploaded_eda_df = pd.read_csv(location_for_eda, skipinitialspace = True)
+        if 'index' in uploaded_eda_df.columns:
+            uploaded_eda_df.drop(labels=['index'], axis=1, inplace=True)
+        
+        else:
+            pass
+
+        #av = AutoViz_Class()
+        #dft = av.AutoViz("", sep=",", depVar="", dfte=uploaded_eda_df, header=0, verbose=1, lowess=False, chart_format="server", max_rows_analyzed=150000, save_plot_dir=None)
+        #small_eda_df = uploaded_eda_df.head(n=5)
+        #eda_df_html = small_eda_df.to_html()
+
+        p = ProfileReport(uploaded_eda_df, explorative=True, dark_mode=True)
+        p.to_file("templates\eda.html")
+        return render_template('eda.html')
+    
+    else:
+        return render_template('eda.html')
+
+
+
 @app.route('/preprocess', methods=['GET', 'POST'])
 def Preprocess():
     if request.method == 'POST':
         
         data_file_path = session.get('uploaded_data_file_path',None)
         preprocess_df = pd.read_csv(data_file_path, skipinitialspace = True)
-        preprocess_df.drop(labels=['index'], axis=1, inplace=True)
-        col = preprocess_df.columns
+
+        if 'index' in preprocess_df.columns:
+            preprocess_df.drop(labels=['index'], axis=1, inplace=True)
+        
+        else:
+            pass
 
         #saving the target label of the dataset
-        target_label = ''
-        target_label += ''.join((preprocess_df.iloc[[1],[len(col)-1]]).columns.tolist())
+        target_label = str(request.form['TargetLabel'])
+        #target_label += ''.join((preprocess_df.iloc[[1],[len(col)-1]]).columns.tolist())
+
+        #Columns to remove 
+        columns_to_remove = str(request.form['ColumnsRemove']).split(',')
+        if len(columns_to_remove)>1:
+            for i in columns_to_remove:
+                preprocess_df.drop(labels=[i], axis=1, inplace=True)
+        else:
+            pass
+
+        col = preprocess_df.columns
 
         #Detecting and processing date time data
         feature_name = ''
@@ -98,14 +142,16 @@ def Preprocess():
         #putting target label back at last
         preprocess_df.insert(len(preprocess_df.columns)-1, target_label, preprocess_df.pop(target_label))  
 
-        
         #Handling missing data
         if request.form['MissingData'] == 'Deletion':
             preprocess_df.dropna(inplace = True)
             preprocess_df.drop_duplicates(inplace = True)
+            temp_target = preprocess_df.pop(target_label)
+
         
         elif request.form['MissingData'] == 'Imputation':
             preprocess_df = preprocess_df.drop(preprocess_df[preprocess_df[target_label] == 'NaN'].index)
+            temp_target = preprocess_df.pop(target_label)
             col_list = preprocess_df.columns.values.tolist()
             imputer = KNNImputer(n_neighbors=5)
             imputed_data = imputer.fit_transform(preprocess_df)
@@ -115,6 +161,8 @@ def Preprocess():
             pass
 
         #Split data to make it easier to perform the functions below
+        preprocess_df[target_label] = temp_target   #push target label back
+
         X_train, X_test, y_train, y_test = train_test_split(
         preprocess_df.drop(labels=[target_label], axis=1),
         preprocess_df[target_label],
@@ -137,37 +185,52 @@ def Preprocess():
             pass
 
         #Feature scaling 
-        date_df = x_all_data[['Day', 'Month', 'Year']].copy()
-        x_all_data = x_all_data.drop(['Day', 'Month', 'Year'], axis=1)
+        date_list = ['Day', 'Month', 'Year']
+        if 'Day' in x_all_data.columns:     
+            date_df = x_all_data[date_list].copy()
+            x_all_data = x_all_data.drop(date_list, axis=1)
+        else:
+            date_list = ''
         
+
         new_col_list = preprocess_df.columns.to_list()
+        target_label_list = list(target_label.split(" "))
 
         if request.form['ScaleData'] == 'Normalization':
             norm_var = MinMaxScaler().fit(x_all_data)
             x_all_data = norm_var.transform(x_all_data)
 
-            new_target = preprocess_df.columns[-1]
-            exclude_list = ['Day', 'Month', 'Year', new_target]
+            exclude_list = [date_list, target_label]
             col_after_elimination = [i for i in new_col_list if i not in exclude_list]
             x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
-            x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            if 'Day' in x_all_data.columns:
+                x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            else:
+                pass
             
 
         elif request.form['ScaleData'] == 'Standardization':
-            date_list = ['Day', 'Month', 'Year']
-            categorical_data = feature_for_label_enc + feature_for_one_enc + date_list
+            if not date_list:
+                categorical_data = feature_for_label_enc + feature_for_one_enc + target_label_list
+            else:
+                categorical_data = feature_for_label_enc + feature_for_one_enc + date_list + target_label_list
+
             res = [i for i in new_col_list if i not in categorical_data]
             
             for j in res:
                 temp_df = pd.DataFrame(x_all_data[j])
                 stan_var = StandardScaler().fit(temp_df)
                 x_all_data[j] = stan_var.transform(temp_df)
-            x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            if "Day" in x_all_data.columns:
+                x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            else:
+                pass
 
         elif request.form['ScaleData'] == 'None':
             pass
 
         #Correlation Based Feature selection
+        preprocess_df.pop(target_label)
         threshold = 0.90
         cor_features = set()   #set of all names of correlated columns
         cor_matrix = preprocess_df.corr()
@@ -181,7 +244,15 @@ def Preprocess():
         
 
         preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
+        
         preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
+
+        #reverse label encoding
+        if 'index' in preprocess_df:
+            preprocess_df.drop(labels=['index'], axis=1, inplace=True)
+        
+        else:
+            pass
 
         download_folder = os.path.join('static','downloads')
         download_file = 'Preprocessed_Data.csv'
@@ -193,6 +264,12 @@ def Preprocess():
     elif request.method == 'GET':
         mylocation = session.get('uploaded_data_file_path',None)
         uploaded_preprocess_df = pd.read_csv(mylocation, skipinitialspace = True)
+
+        if 'index' in uploaded_preprocess_df.columns:
+            uploaded_preprocess_df.drop(labels=['index'], axis=1, inplace=True)
+        else:
+            pass
+
         small_preprocess_df = uploaded_preprocess_df.head(n=5)
         preprocess_df_html = small_preprocess_df.to_html()
         return render_template('preprocess.html', data_var = preprocess_df_html)
@@ -217,6 +294,7 @@ def download_csv():
     download_file_path = session.get('download_data_file_path',None)
     return send_file(download_file_path, as_attachment=True)
 
+
 @app.route('/model', methods=['GET', 'POST'])
 def model_implementation():
     if request.method == 'GET':
@@ -225,6 +303,9 @@ def model_implementation():
     elif request.method == 'POST':
         data_file_for_model = session.get('uploaded_data_file_path', None)
         model_df = pd.read_csv(data_file_for_model, skipinitialspace=True)
+
+        if 'index' in model_df:
+            model_df.drop(labels=['index'], axis=1, inplace=True)
 
         model_target = model_df.columns[-1]     #Selecting the last label as target
         #train test split
