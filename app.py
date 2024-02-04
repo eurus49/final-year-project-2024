@@ -17,6 +17,7 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import RandomizedSearchCV
 from ydata_profiling import ProfileReport
 from sklearn import preprocessing
+from joblib import dump, load
 
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
@@ -339,11 +340,6 @@ def model_implementation():
             Tuned_model = FinalModel.best_estimator_
 
             predictions = Tuned_model.predict(X_test)
-
-            report = classification_report(y_test, predictions, digits=4, output_dict=True)
-            report_df = pd.DataFrame.from_dict(report)
-            report_df = report_df.transpose()
-            return render_template('result.html', result_data=report_df, params=best_params)
         
         elif request.form['submit_button'] == 'KNN':
             hyperparameters = [{'leaf_size':[i for i in range(1, 20)], 
@@ -364,12 +360,7 @@ def model_implementation():
 
             Tuned_model = FinalModel.best_estimator_
             
-            predictions = Tuned_model.predict(X_test)
-            
-            report = classification_report(y_test, predictions, digits=4, output_dict=True)
-            report_df = pd.DataFrame.from_dict(report)
-            report_df = report_df.transpose()
-            return render_template('result.html', result_data=report_df, params=best_params)
+            predictions = Tuned_model.predict(X_test)    
         
         elif request.form['submit_button'] == 'SVM':
             hyperparameters = [{'kernel':['rbf'], 'C':[0.1,1,10,100], 
@@ -391,12 +382,22 @@ def model_implementation():
 
             predictions = Tuned_model.predict(X_test)
 
-            report = classification_report(y_test, predictions, digits=4, output_dict=True)
-            report_df = pd.DataFrame.from_dict(report)
-            report_df = report_df.transpose()
-            return render_template('result.html', result_data=report_df, params = best_params)
+        
+        report = classification_report(y_test, predictions, digits=4, output_dict=True)
+        report_df = pd.DataFrame.from_dict(report)
+        report_df = report_df.transpose()
+
+        dump(Tuned_model,'static\models\model.joblib')
+        model_file_path = 'static\models\model.joblib'
+        session['model_file_path'] = model_file_path
+        return render_template('result.html', result_data=report_df, params = best_params)
             
         
+@app.route('/downloadModel', methods=['GET', 'POST'])
+def downloadModel():
+    model_file_path = session.get('model_file_path',None)
+    return send_file(model_file_path, as_attachment=True)
+
 
 
 if __name__ == "__main__":

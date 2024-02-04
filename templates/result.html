@@ -10,6 +10,17 @@
     <pre>{{ result_data }}</pre><br>
     <p>The optimum parameters selected for the models are </p>
     {{ params|safe }}
+
+</div>
+
+<div style="text-align: center;">
+    <form action = "/downloadModel" method = "POST" enctype="multipart/form-data" target="_blank" >    
+        <input class="btn" type="submit" value="Download">
+
+    </form>
+    <form action="/" method = "GET" enctype="multipart/form-data" target="_self">
+        <input class="btn" type="submit" value="Homepage">
+    </form>
 </div>
 
 {% endblock %}
