@@ -17,7 +17,7 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import RandomizedSearchCV
 from ydata_profiling import ProfileReport
 from sklearn import preprocessing
-from joblib import dump, load
+from joblib import dump
 
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
@@ -47,16 +47,20 @@ def uploapreprocess_dfile():
         if request.form['submit_button'] == 'EDA':
              return redirect('/eda')
 
-        elif request.form['submit_button'] == 'Preprocess':
+        elif request.form['submit_button'] == 'Manual Preprocess':
             #uploaded_preprocess_df = pd.read_csv(file_location)
             return redirect('/preprocess')
             #return render_template('preprocess.html', data_var = preprocess_df_html)
         
+        elif request.form['submit_button'] == 'Auto Preprocess':
+             return redirect('/autoprep')
+
         elif request.form['submit_button'] == 'Model':
              return render_template('model.html')
     
     else:
         return render_template('index.html')
+
 
 @app.route('/eda', methods=['GET', 'POST'])
 def eda():
@@ -82,7 +86,7 @@ def eda():
         return render_template('eda.html')
 
 
-
+#Manual preprocessing
 @app.route('/preprocess', methods=['GET', 'POST'])
 def Preprocess():
     if request.method == 'POST':
@@ -276,6 +280,165 @@ def Preprocess():
         return render_template('preprocess.html', data_var = preprocess_df_html)
 
 
+#Auto preprocessing
+@app.route('/autoprep', methods=['GET', 'POST'])
+def autoprep():
+    if request.method == 'GET':
+        mylocation = session.get('uploaded_data_file_path',None)
+        uploaded_preprocess_df = pd.read_csv(mylocation, skipinitialspace = True)
+
+        if 'index' in uploaded_preprocess_df.columns:
+            uploaded_preprocess_df.drop(labels=['index'], axis=1, inplace=True)
+        else:
+            pass
+
+        small_preprocess_df = uploaded_preprocess_df.head(n=5)
+        preprocess_df_html = small_preprocess_df.to_html()
+        return render_template('autoprep.html', data_var = preprocess_df_html)
+    
+    #Actual preprocessing begins here
+    elif request.method == 'POST':
+        data_file_path = session.get('uploaded_data_file_path',None)
+        autoprep_df = pd.read_csv(data_file_path, skipinitialspace = True)
+
+        if 'index' in autoprep_df.columns:
+            autoprep_df.drop(labels=['index'], axis=1, inplace=True)
+        
+        else:
+            pass
+
+        #saving the target label of the dataset
+        auto_target = str(request.form['TargetLabel'])
+        #target_label += ''.join((preprocess_df.iloc[[1],[len(col)-1]]).columns.tolist())
+
+        auto_col = autoprep_df.columns
+
+        #Detecting and processing date time data
+        feature_name = ''
+        for i in range(1, len(auto_col)):
+            if "/" in str(autoprep_df.iloc[[1],[i]]) and "Time" in str((autoprep_df.iloc[[1],[i]]).columns.tolist()) :
+                var = autoprep_df.iloc[[1],[i]].columns.tolist()
+                for item in var:
+                    feature_name += item    
+                autoprep_df[feature_name] = pd.to_datetime(autoprep_df[feature_name], format = '%d/%m/%Y %I:%M')
+                autoprep_df['Day'] = autoprep_df[feature_name].dt.day
+                autoprep_df['Month'] = autoprep_df[feature_name].dt.month
+                autoprep_df['Year'] = autoprep_df[feature_name].dt.year
+                autoprep_df.drop(autoprep_df.columns[[i]], axis=1, inplace=True)   #deleting the date time column
+
+        #Identifying categorical features for encoding
+        feature_for_one_enc = []
+        for name, column in autoprep_df.items():
+            unique_count = column.unique().shape[0]
+            total_count = column.shape[0]
+        if unique_count / total_count < 0.01:
+            feature_for_one_enc.append(name)
+
+        feature_for_one_enc = list(filter(lambda x: x != auto_target, feature_for_one_enc))
+        date_list = ['Day', 'Month', 'Year']
+        for i in date_list:
+            feature_for_one_enc = list(filter(lambda x: x != i, feature_for_one_enc))
+        
+        #One hot encoding
+        if not feature_for_one_enc:
+            pass
+        else:
+            for y in feature_for_one_enc:
+                autoprep_df = pd.get_dummies(autoprep_df, columns=[y], drop_first = True)
+        
+        #putting target label back at last
+        autoprep_df.insert(len(autoprep_df.columns)-1, auto_target, autoprep_df.pop(auto_target))
+
+        #Handling missing data through imputation      
+        autoprep_df = autoprep_df.drop(autoprep_df[autoprep_df[auto_target] == 'NaN'].index)
+        temp_target = autoprep_df.pop(auto_target)
+        col_list = autoprep_df.columns.values.tolist()
+        imputer = KNNImputer(n_neighbors=5)
+        imputed_data = imputer.fit_transform(autoprep_df)
+        autoprep_df = pd.DataFrame(data=imputed_data, columns = col_list)
+
+        #Split data to make it easier to perform the functions below
+        autoprep_df[auto_target] = temp_target   #push target label back
+
+        X_train, X_test, y_train, y_test = train_test_split(
+        autoprep_df.drop(labels=[auto_target], axis=1),
+        autoprep_df[auto_target],
+        test_size=0.3,
+        random_state=None)
+
+        x_all_data = pd.concat([X_train,X_test], axis=0)
+        y_all_data = pd.concat([y_train,y_test], axis=0)
+
+        #Handling imbalanced dataset
+        sm = SMOTE(random_state=42)
+        x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
+        
+
+        #Feature scaling 
+        
+        if 'Day' in x_all_data.columns:     
+            date_df = x_all_data[date_list].copy()
+            x_all_data = x_all_data.drop(date_list, axis=1)
+        else:
+            date_list = ''
+        
+
+        new_col_list = autoprep_df.columns.to_list()
+
+        if request.form['submit_button'] == 'KNN' or 'SVM':
+            norm_var = MinMaxScaler().fit(x_all_data)
+            x_all_data = norm_var.transform(x_all_data)
+
+            list_tar = list(auto_target.split())
+            if (len(date_list)>1):
+                exclude_list = date_list + list_tar
+            else:
+                exclude_list = list_tar
+                
+            col_after_elimination = [i for i in new_col_list if i not in exclude_list]
+
+            x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
+            if 'Day' in x_all_data.columns:
+                x_all_data = pd.concat([x_all_data,date_df], axis=1)
+            else:
+                pass
+
+        else:
+            pass
+
+        #Correlation Based Feature selection
+        autoprep_df.pop(auto_target)
+        threshold = 0.90
+        cor_features = set()   #set of all names of correlated columns
+        cor_matrix = autoprep_df.corr()
+        for i in range(len(cor_matrix.columns)):
+            for j in range(i):
+                if abs(cor_matrix.iloc[i, j]) > threshold: #Absolute coeff value is used
+                    colName = cor_matrix.columns[i]  #saving the names of correlated columns
+                    cor_features.add(colName)
+        
+        x_all_data.drop(labels=cor_features, axis=1, inplace=True)
+        
+
+        autoprep_df = pd.concat([x_all_data,y_all_data], axis=1)
+        
+        autoprep_df = autoprep_df.sample(frac=1, random_state=1).reset_index()
+
+        #reverse label encoding
+        if 'index' in autoprep_df:
+            autoprep_df.drop(labels=['index'], axis=1, inplace=True)
+        
+        else:
+            pass
+
+        download_folder = os.path.join('static','downloads')
+        download_file = 'Preprocessed_Data.csv'
+        download_file_path = download_folder + "/" + download_file   #Creating path where the downloadable file will be stored
+        autoprep_df.to_csv(download_file_path, index=False)
+        session['download_data_file_path'] = download_file_path  #Store download file path in session
+        return redirect('/download')
+        
+
 
 @app.route('/download', methods=['GET', 'POST'])
 def download():
@@ -338,8 +501,6 @@ def model_implementation():
             best_params = FinalModel.best_params_
             
             Tuned_model = FinalModel.best_estimator_
-
-            predictions = Tuned_model.predict(X_test)
         
         elif request.form['submit_button'] == 'KNN':
             hyperparameters = [{'leaf_size':[i for i in range(1, 20)], 
@@ -358,9 +519,7 @@ def model_implementation():
 
             best_params = FinalModel.best_params_
 
-            Tuned_model = FinalModel.best_estimator_
-            
-            predictions = Tuned_model.predict(X_test)    
+            Tuned_model = FinalModel.best_estimator_   
         
         elif request.form['submit_button'] == 'SVM':
             hyperparameters = [{'kernel':['rbf'], 'C':[0.1,1,10,100], 
@@ -380,9 +539,8 @@ def model_implementation():
 
             Tuned_model = FinalModel.best_estimator_
 
-            predictions = Tuned_model.predict(X_test)
-
-        
+            
+        predictions = Tuned_model.predict(X_test)
         report = classification_report(y_test, predictions, digits=4, output_dict=True)
         report_df = pd.DataFrame.from_dict(report)
         report_df = report_df.transpose()
@@ -390,14 +548,14 @@ def model_implementation():
         dump(Tuned_model,'static\models\model.joblib')
         model_file_path = 'static\models\model.joblib'
         session['model_file_path'] = model_file_path
+
         return render_template('result.html', result_data=report_df, params = best_params)
             
         
-@app.route('/downloadModel', methods=['GET', 'POST'])
+@app.route('/downloadModel', methods=['POST'])
 def downloadModel():
     model_file_path = session.get('model_file_path',None)
     return send_file(model_file_path, as_attachment=True)
-
 
 
 if __name__ == "__main__":

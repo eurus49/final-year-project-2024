@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block head %} 
+<h2>Dataset</h2>
+{% endblock %}
+
+{% block body %} 
+{{ data_var|safe}}
+<div style="text-align: center;">
+    <form action = "/autoprep" method = "POST" enctype="multipart/form-data" target="_self" >    
+        <br><br>
+        <label>Enter target label </label>
+        <input type="text" id="TargetLabel" name="TargetLabel" required> <br><br>
+        <br><br>
+    
+        <input style="margin-right: 1cm;" class="btn" type = "submit" name="submit_button" value="Decision Tree">
+        <input style="margin-right: 1cm;" class="btn" type = "submit" name="submit_button" value="KNN">
+        <input class="btn" type = "submit" name="submit_button" value="SVM">    
+    </form>
+</div>
+
+{% endblock %}
