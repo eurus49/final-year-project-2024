@@ -22,6 +22,9 @@ from joblib import dump
 #importing evaluation function
 from evaluation import evaluate
 
+import signal
+import sys
+
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
 
@@ -31,6 +34,12 @@ app = Flask(__name__)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = 'Secret key to utilize session'
+
+def signal_handler(signal, frame):
+    print('terminating')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 @app.route('/', methods=['GET', 'POST'])
 def uploapreprocess_dfile():
@@ -149,14 +158,13 @@ def Preprocess():
         
         #putting target label back at last
         preprocess_df.insert(len(preprocess_df.columns)-1, target_label, preprocess_df.pop(target_label))  
-
+        
         #Handling missing data
         if request.form['MissingData'] == 'Deletion':
             preprocess_df.dropna(inplace = True)
             preprocess_df.drop_duplicates(inplace = True)
             temp_target = preprocess_df.pop(target_label)
 
-        
         elif request.form['MissingData'] == 'Imputation':
             preprocess_df = preprocess_df.drop(preprocess_df[preprocess_df[target_label] == 'NaN'].index)
             temp_target = preprocess_df.pop(target_label)
@@ -166,15 +174,20 @@ def Preprocess():
             preprocess_df = pd.DataFrame(data=imputed_data, columns = col_list)
 
         elif request.form['MissingData'] == 'None':
-            pass
+            temp_target = preprocess_df.pop(target_label)
 
 
         #Handle outlier
+        numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
+        numeric_columns = preprocess_df.select_dtypes(include=numerics).columns
+
         if request.form['Outlier'] == 'IQR':    
-            q1 = preprocess_df.quantile(0.25)
-            q3 = preprocess_df.quantile(0.75)
-            IQR = q3 - q1
-            preprocess_df = preprocess_df[~((preprocess_df<(q1-1.5*IQR))|(preprocess_df>(q3+1.5*IQR)))]
+            for i in numeric_columns:
+                q1 = preprocess_df[i].quantile(0.25)
+                q3 = preprocess_df[i].quantile(0.75)
+                IQR = q3-q1
+                preprocess_df = preprocess_df[(preprocess_df[i] >= q1) & (preprocess_df[i]) <= q3]            
+            
             preprocess_df.dropna(inplace = True)
 
         elif request.form['Outlier'] == 'None':
@@ -192,6 +205,7 @@ def Preprocess():
         x_all_data = pd.concat([X_train,X_test], axis=0)
         y_all_data = pd.concat([y_train,y_test], axis=0)
 
+        print(y_all_data)
         #Handling imbalanced dataset
         if request.form['ImbalanceData'] == 'UnderSample':
             rs = RandomUnderSampler(random_state=42)
@@ -220,9 +234,12 @@ def Preprocess():
             norm_var = MinMaxScaler().fit(x_all_data)
             x_all_data = norm_var.transform(x_all_data)
 
-            exclude_list = date_list + target_label_list
+            if(not date_list):
+                exclude_list = target_label_list
+            else:
+                exclude_list = date_list + target_label_list
+
             col_after_elimination = [i for i in new_col_list if i not in exclude_list]
-            print(exclude_list)
 
             x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
             if 'Day' in x_all_data.columns:
@@ -252,20 +269,26 @@ def Preprocess():
             pass
 
         #Correlation Based Feature selection
-        preprocess_df.pop(target_label)
-        threshold = 0.90
-        cor_features = set()   #set of all names of correlated columns
-        cor_matrix = preprocess_df.corr()
-        for i in range(len(cor_matrix.columns)):
-            for j in range(i):
-                if abs(cor_matrix.iloc[i, j]) > threshold: #Absolute coeff value is used
-                    colName = cor_matrix.columns[i]  #saving the names of correlated columns
-                    cor_features.add(colName)
-        
-        x_all_data.drop(labels=cor_features, axis=1, inplace=True)
-        
+        if request.form['FeatureSelection'] == 'Corr':
+            preprocess_df.pop(target_label)
+            threshold = 0.90
+            cor_features = set()   #set of all names of correlated columns
+            cor_matrix = preprocess_df.corr()
+            for i in range(len(cor_matrix.columns)):
+                for j in range(i):
+                    if abs(cor_matrix.iloc[i, j]) > threshold: #Absolute coeff value is used
+                        colName = cor_matrix.columns[i]  #saving the names of correlated columns
+                        cor_features.add(colName)
+            
+            x_all_data.drop(labels=cor_features, axis=1, inplace=True)
+            preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
 
-        preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
+        else:
+            preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
+
+        
+        preprocess_df.dropna(inplace = True)
+        preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
 
         #remove index label
         if 'index' in preprocess_df:
@@ -274,8 +297,6 @@ def Preprocess():
         else:
             pass
         
-        preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
-
         download_folder = os.path.join('static','downloads')
         download_file = 'Preprocessed_Data.csv'
         download_file_path = download_folder + "/" + download_file   #Creating path where the downloadable file will be stored
@@ -420,12 +441,18 @@ def autoprep():
 
         #handle outliers
         temp_target_qt = autoprep_df.pop(auto_target)
-        q1 = autoprep_df.quantile(0.25)
-        q3 = autoprep_df.quantile(0.75)
-        IQR = q3 - q1
-        autoprep_df = autoprep_df[~((autoprep_df<(q1-1.5*IQR))|(autoprep_df>(q3+1.5*IQR)))]
+        numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
+        numeric_columns_auto = autoprep_df.select_dtypes(include=numerics).columns 
+        
+        for i in numeric_columns_auto:
+            q1 = autoprep_df[i].quantile(0.25)
+            q3 = autoprep_df[i].quantile(0.75)
+            IQR = q3-q1
+            autoprep_df = autoprep_df[(autoprep_df[i] >= q1) & (autoprep_df[i]) <= q3]            
+    
         autoprep_df[auto_target] = temp_target_qt
-        autoprep_df.dropna(inplace = True)
+        autoprep_df.dropna(inplace = True) 
+
 
         #Split data to make it easier to perform the functions below
         autoprep_df[auto_target] = temp_target   #push target label back
