@@ -19,6 +19,9 @@ from ydata_profiling import ProfileReport
 from sklearn import preprocessing
 from joblib import dump
 
+#importing evaluation function
+from evaluation import evaluate
+
 
 UPLOAD_FOLDER = os.path.join('static','uploads')
 
@@ -44,7 +47,7 @@ def uploapreprocess_dfile():
 
         session['uploaded_data_file_path'] = file_location
 
-        if request.form['submit_button'] == 'EDA':
+        if request.form['submit_button'] == 'Data Profile':
              return redirect('/eda')
 
         elif request.form['submit_button'] == 'Manual Preprocess':
@@ -165,6 +168,18 @@ def Preprocess():
         elif request.form['MissingData'] == 'None':
             pass
 
+
+        #Handle outlier
+        if request.form['Outlier'] == 'IQR':    
+            q1 = preprocess_df.quantile(0.25)
+            q3 = preprocess_df.quantile(0.75)
+            IQR = q3 - q1
+            preprocess_df = preprocess_df[~((preprocess_df<(q1-1.5*IQR))|(preprocess_df>(q3+1.5*IQR)))]
+            preprocess_df.dropna(inplace = True)
+
+        elif request.form['Outlier'] == 'None':
+            pass
+
         #Split data to make it easier to perform the functions below
         preprocess_df[target_label] = temp_target   #push target label back
 
@@ -205,8 +220,10 @@ def Preprocess():
             norm_var = MinMaxScaler().fit(x_all_data)
             x_all_data = norm_var.transform(x_all_data)
 
-            exclude_list = [date_list, target_label]
+            exclude_list = date_list + target_label_list
             col_after_elimination = [i for i in new_col_list if i not in exclude_list]
+            print(exclude_list)
+
             x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
             if 'Day' in x_all_data.columns:
                 x_all_data = pd.concat([x_all_data,date_df], axis=1)
@@ -249,15 +266,15 @@ def Preprocess():
         
 
         preprocess_df = pd.concat([x_all_data,y_all_data], axis=1)
-        
-        preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
 
-        #reverse label encoding
+        #remove index label
         if 'index' in preprocess_df:
             preprocess_df.drop(labels=['index'], axis=1, inplace=True)
         
         else:
             pass
+        
+        preprocess_df = preprocess_df.sample(frac=1, random_state=1).reset_index()
 
         download_folder = os.path.join('static','downloads')
         download_file = 'Preprocessed_Data.csv'
@@ -309,6 +326,9 @@ def autoprep():
 
         #saving the target label of the dataset
         auto_target = str(request.form['TargetLabel'])
+
+        #label_encoder = preprocessing.LabelEncoder()
+        #autoprep_df[auto_target] = label_encoder.fit_transform(autoprep_df[auto_target])
         #target_label += ''.join((preprocess_df.iloc[[1],[len(col)-1]]).columns.tolist())
 
         auto_col = autoprep_df.columns
@@ -325,37 +345,87 @@ def autoprep():
                 autoprep_df['Month'] = autoprep_df[feature_name].dt.month
                 autoprep_df['Year'] = autoprep_df[feature_name].dt.year
                 autoprep_df.drop(autoprep_df.columns[[i]], axis=1, inplace=True)   #deleting the date time column
+        
+
+        autoprep_df.insert(len(autoprep_df.columns)-1, auto_target, autoprep_df.pop(auto_target))
 
         #Identifying categorical features for encoding
-        feature_for_one_enc = []
+        feature_for_enc = []
         for name, column in autoprep_df.items():
             unique_count = column.unique().shape[0]
             total_count = column.shape[0]
-        if unique_count / total_count < 0.01:
-            feature_for_one_enc.append(name)
+            if unique_count / total_count < 0.1:
+                feature_for_enc.append(name)
 
-        feature_for_one_enc = list(filter(lambda x: x != auto_target, feature_for_one_enc))
+        feature_for_enc = list(filter(lambda x: x != auto_target, feature_for_enc))
         date_list = ['Day', 'Month', 'Year']
         for i in date_list:
-            feature_for_one_enc = list(filter(lambda x: x != i, feature_for_one_enc))
+            feature_for_enc = list(filter(lambda x: x != i, feature_for_enc))
         
-        #One hot encoding
-        if not feature_for_one_enc:
+        #Data Encoding
+        temp_df = autoprep_df
+        if not feature_for_enc:
             pass
         else:
-            for y in feature_for_one_enc:
-                autoprep_df = pd.get_dummies(autoprep_df, columns=[y], drop_first = True)
+            for y in feature_for_enc:  #one hot encoding
+                autoprep_df_oe = pd.get_dummies(temp_df, columns=[y], drop_first = True)
         
-        #putting target label back at last
-        autoprep_df.insert(len(autoprep_df.columns)-1, auto_target, autoprep_df.pop(auto_target))
+            for x in feature_for_enc:  #label encoding
+                label_encoder = preprocessing.LabelEncoder()
+                temp_df[x] = label_encoder.fit_transform(temp_df[x])
 
-        #Handling missing data through imputation      
-        autoprep_df = autoprep_df.drop(autoprep_df[autoprep_df[auto_target] == 'NaN'].index)
-        temp_target = autoprep_df.pop(auto_target)
-        col_list = autoprep_df.columns.values.tolist()
+            #evalute 
+            autoprep_df_oe.insert(len(autoprep_df_oe.columns)-1, auto_target, autoprep_df_oe.pop(auto_target))
+            score_oe = evaluate(autoprep_df_oe)   #calculate score for one hot encoding
+
+            print(temp_df.columns)
+            score_lb = evaluate(temp_df)    #calculate score for label encoding
+
+            if(score_oe > score_lb):
+                autoprep_df = autoprep_df_oe
+            else:
+                autoprep_df = temp_df
+            
+        #putting target label back at last
+        #autoprep_df.insert(len(autoprep_df.columns)-1, auto_target, autoprep_df.pop(auto_target))
+
+
+        #Handling missing data
+        #Imputation
+        temp_df_imp = autoprep_df  
+        temp_df_imp.drop_duplicates(inplace = True)   
+        temp_df_imp = temp_df_imp.drop(temp_df_imp[temp_df_imp[auto_target] == 'NaN'].index)
+        temp_target = temp_df_imp.pop(auto_target)
+        col_list = temp_df_imp.columns.values.tolist()
         imputer = KNNImputer(n_neighbors=5)
-        imputed_data = imputer.fit_transform(autoprep_df)
-        autoprep_df = pd.DataFrame(data=imputed_data, columns = col_list)
+        imputed_data = imputer.fit_transform(temp_df_imp)
+        temp_df_imp = pd.DataFrame(data=imputed_data, columns = col_list)
+        temp_df_imp[auto_target] = temp_target
+        temp_df_imp.dropna(inplace = True)
+
+        #Deletion
+        temp_df_del = autoprep_df
+        temp_df_del.dropna(inplace = True)
+        temp_df_del.drop_duplicates(inplace = True)
+
+        #evaluate
+        score_imp = evaluate(temp_df_imp)
+        score_del = evaluate(temp_df_del)
+
+        if(score_imp > score_del):
+            autoprep_df = temp_df_imp
+        else:
+            autoprep_df = temp_df_del
+
+
+        #handle outliers
+        temp_target_qt = autoprep_df.pop(auto_target)
+        q1 = autoprep_df.quantile(0.25)
+        q3 = autoprep_df.quantile(0.75)
+        IQR = q3 - q1
+        autoprep_df = autoprep_df[~((autoprep_df<(q1-1.5*IQR))|(autoprep_df>(q3+1.5*IQR)))]
+        autoprep_df[auto_target] = temp_target_qt
+        autoprep_df.dropna(inplace = True)
 
         #Split data to make it easier to perform the functions below
         autoprep_df[auto_target] = temp_target   #push target label back
@@ -385,32 +455,42 @@ def autoprep():
 
         new_col_list = autoprep_df.columns.to_list()
 
-        if request.form['submit_button'] == 'KNN' or 'SVM':
-            norm_var = MinMaxScaler().fit(x_all_data)
-            x_all_data = norm_var.transform(x_all_data)
+        #Normalization
+        norm_var = MinMaxScaler().fit(x_all_data)
+        x_all_data = norm_var.transform(x_all_data)
 
-            list_tar = list(auto_target.split())
-            if (len(date_list)>1):
-                exclude_list = date_list + list_tar
-            else:
-                exclude_list = list_tar
+        list_tar = list(auto_target.split())
+        if (len(date_list)>1):
+            exclude_list = date_list + list_tar
+        else:
+            exclude_list = list_tar
                 
-            col_after_elimination = [i for i in new_col_list if i not in exclude_list]
+        col_after_elimination = [i for i in new_col_list if i not in exclude_list]
 
-            x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
-            if 'Day' in x_all_data.columns:
-                x_all_data = pd.concat([x_all_data,date_df], axis=1)
-            else:
-                pass
+        x_all_data = pd.DataFrame(data=x_all_data, columns = col_after_elimination)
+        if 'Day' in x_all_data.columns:
+            x_all_data = pd.concat([x_all_data,date_df], axis=1)
+        else:
+            pass
+        
+        #Evalute
+        temp_df_norm = pd.concat([x_all_data,y_all_data], axis=1)
+        temp_df_norm = temp_df_norm.sample(frac=1, random_state=1).reset_index()
 
+        score_norm = evaluate(temp_df_norm)
+        score_no_scale = evaluate(autoprep_df)
+
+        if(score_norm > score_no_scale):
+            autoprep_df = temp_df_norm
         else:
             pass
 
         #Correlation Based Feature selection
-        autoprep_df.pop(auto_target)
+        temp_df_cor = autoprep_df
+        temp_target_cor = temp_df_cor.pop(auto_target)
         threshold = 0.90
         cor_features = set()   #set of all names of correlated columns
-        cor_matrix = autoprep_df.corr()
+        cor_matrix = temp_df_cor.corr()
         for i in range(len(cor_matrix.columns)):
             for j in range(i):
                 if abs(cor_matrix.iloc[i, j]) > threshold: #Absolute coeff value is used
@@ -419,12 +499,24 @@ def autoprep():
         
         x_all_data.drop(labels=cor_features, axis=1, inplace=True)
         
+        temp_df_cor = pd.concat([x_all_data,y_all_data], axis=1)
+        temp_df_cor = temp_df_cor.sample(frac=1, random_state=1).reset_index()
+        temp_df_cor[auto_target] = temp_target_cor
+        temp_df_cor.dropna(inplace = True)
 
-        autoprep_df = pd.concat([x_all_data,y_all_data], axis=1)
-        
-        autoprep_df = autoprep_df.sample(frac=1, random_state=1).reset_index()
+        autoprep_df[auto_target] = temp_target_cor
+        autoprep_df.dropna(inplace = True)
 
-        #reverse label encoding
+        #Evaluate
+        score_cor = evaluate(temp_df_cor)
+        score_no_cor = evaluate(autoprep_df)
+
+        if(score_cor > score_no_cor):
+            autoprep_df = temp_df_cor
+        else:
+            pass
+
+        #delete index column
         if 'index' in autoprep_df:
             autoprep_df.drop(labels=['index'], axis=1, inplace=True)
         
