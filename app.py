@@ -118,7 +118,8 @@ def Preprocess():
 
         #Columns to remove 
         columns_to_remove = str(request.form['ColumnsRemove']).split(',')
-        if len(columns_to_remove)>1:
+        print(columns_to_remove)
+        if len(columns_to_remove) >= 1 and columns_to_remove != ['']:
             for i in columns_to_remove:
                 preprocess_df.drop(labels=[i], axis=1, inplace=True)
         else:
@@ -180,13 +181,13 @@ def Preprocess():
         #Handle outlier
         numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
         numeric_columns = preprocess_df.select_dtypes(include=numerics).columns
-
+        print(numeric_columns)
         if request.form['Outlier'] == 'IQR':    
-            for i in numeric_columns:
-                q1 = preprocess_df[i].quantile(0.25)
-                q3 = preprocess_df[i].quantile(0.75)
-                IQR = q3-q1
-                preprocess_df = preprocess_df[(preprocess_df[i] >= q1) & (preprocess_df[i]) <= q3]            
+            q1 = preprocess_df[numeric_columns].quantile(0.25)
+            q3 = preprocess_df[numeric_columns].quantile(0.75)
+            IQR = q3-q1
+            condition = ~((preprocess_df[numeric_columns] < (q1 - 1.5 * IQR)) | (preprocess_df[numeric_columns] > (q3 + 1.5 * IQR))).any(axis=1)
+            preprocess_df = preprocess_df[condition]
             
             preprocess_df.dropna(inplace = True)
 
@@ -194,8 +195,7 @@ def Preprocess():
             pass
 
         #Split data to make it easier to perform the functions below
-        preprocess_df[target_label] = temp_target   #push target label back
-
+        preprocess_df[target_label] = temp_target   #push target label back        
         X_train, X_test, y_train, y_test = train_test_split(
         preprocess_df.drop(labels=[target_label], axis=1),
         preprocess_df[target_label],
@@ -205,14 +205,15 @@ def Preprocess():
         x_all_data = pd.concat([X_train,X_test], axis=0)
         y_all_data = pd.concat([y_train,y_test], axis=0)
 
-        print(y_all_data)
         #Handling imbalanced dataset
         if request.form['ImbalanceData'] == 'UnderSample':
             rs = RandomUnderSampler(random_state=42)
             x_all_data, y_all_data = rs.fit_resample(x_all_data,y_all_data)
         
         elif request.form['ImbalanceData'] == 'OverSample':
-            sm = SMOTE(random_state=42)
+            imb_temp_manprep = y_all_data.value_counts()
+            n_manprep = imb_temp_manprep.min(axis=0)
+            sm = SMOTE(random_state=42, k_neighbors=n_manprep-1)
             x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
         
         elif request.form['ImbalanceData'] == 'None':
@@ -444,11 +445,11 @@ def autoprep():
         numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
         numeric_columns_auto = autoprep_df.select_dtypes(include=numerics).columns 
         
-        for i in numeric_columns_auto:
-            q1 = autoprep_df[i].quantile(0.25)
-            q3 = autoprep_df[i].quantile(0.75)
-            IQR = q3-q1
-            autoprep_df = autoprep_df[(autoprep_df[i] >= q1) & (autoprep_df[i]) <= q3]            
+        q1 = autoprep_df[numeric_columns_auto].quantile(0.25)
+        q3 = autoprep_df[numeric_columns_auto].quantile(0.75)
+        IQR = q3-q1
+        condition = ~((autoprep_df[numeric_columns_auto] < (q1 - 1.5 * IQR)) | (autoprep_df[numeric_columns_auto] > (q3 + 1.5 * IQR))).any(axis=1)
+        autoprep_df = autoprep_df[condition]          
     
         autoprep_df[auto_target] = temp_target_qt
         autoprep_df.dropna(inplace = True) 
@@ -460,15 +461,16 @@ def autoprep():
         X_train, X_test, y_train, y_test = train_test_split(
         autoprep_df.drop(labels=[auto_target], axis=1),
         autoprep_df[auto_target],
-        test_size=0.3,
+        test_size = 0.3,
         random_state=None)
 
         x_all_data = pd.concat([X_train,X_test], axis=0)
         y_all_data = pd.concat([y_train,y_test], axis=0)
 
         #Handling imbalanced dataset
-        sm = SMOTE(random_state=42)
-        x_all_data, y_all_data = sm.fit_resample(x_all_data,y_all_data)
+        imb_temp = y_all_data.value_counts()
+        n = imb_temp.min(axis=0)
+        x_all_data, y_all_data = SMOTE(random_state=42, k_neighbors=n-1).fit_resample(x_all_data,y_all_data)
         
 
         #Feature scaling 

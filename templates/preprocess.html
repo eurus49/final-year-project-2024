@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block head %} 
+<h2 style="color: black; text-align: center;">Manual Data Preprocessing </h2>
 <h2>Dataset</h2>
 {% endblock %}
 
@@ -19,7 +20,9 @@
         <input type="radio" id="Deletion" name="MissingData" value="Deletion">
         <label for="Deletion">Deletion</label>
         <input type="radio" id="Imputation" name="MissingData" value="Imputation">
-        <label for="Imputation">Imputation</label><br><br>
+        <label for="Imputation">Imputation</label>
+        <input type="radio" id="None" name="MissingData" value="None">
+        <label for="None">None</label><br><br>
 
         <label>Handle outliers</label>
         <input type="radio" id="IQR" name="Outlier" value="IQR">
@@ -41,8 +44,12 @@
         <label for="OneHotEncoding">Columns for one hot encoding</label>
         <input type="text" id="OneHotEncoding" name="OneHotEncoding"> <br><br>
     
-        <label>Feature Selection: Correlation based Feature Selection</label><br><br>
-    
+        <label>Feature Selection</label><br>
+        <input type="radio" id="Corr" name="FeatureSelection" value="Corr">
+        <label for="OverSample">Correlation Based</label>
+        <input type="radio" id="None" name="FeatureSelection" value="None">
+        <label for="None">None</label><br><br>
+
         <label>Feature Scaling</label><br>
         <input type="radio" id="Normalization" name="ScaleData" value="Normalization">
         <label for="Normalization">Normalization</label>
