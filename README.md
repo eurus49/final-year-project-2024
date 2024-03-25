@@ -1,6 +1,7 @@
 some screenshots of the developed system UI.
 
 Homepage
+
 ![image](https://github.com/eurus49/final-year-project-2024/assets/135999571/a15a73cd-0ab1-462d-9e16-23a21d52500b)
 
 Automated data preprocessing UI
