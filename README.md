@@ -8,6 +8,7 @@ Automated data preprocessing UI
 ![image](https://github.com/eurus49/final-year-project-2024/assets/135999571/25fa653d-0193-415a-811d-e6c84fff4a45)
 
 Manual data preprocessing UI
+
 ![image](https://github.com/eurus49/final-year-project-2024/assets/135999571/1385e6f4-6c68-49f9-bd30-15a87f500ccb)
 ![image](https://github.com/eurus49/final-year-project-2024/assets/135999571/91ed53eb-c608-45a5-9427-0eb47c864d32)
 
